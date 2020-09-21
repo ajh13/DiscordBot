@@ -1,6 +1,5 @@
 # Ignore token
-configuration/bot_token.txt
-
+configuration/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
