@@ -1,6 +1,5 @@
-# Ignore member data
-member_data/
-src/bot_token.txt
+# Ignore token
+configuration/bot_token.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
