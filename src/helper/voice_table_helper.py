@@ -3,6 +3,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 from boto3.dynamodb.types import TypeSerializer, TypeDeserializer
+from datetime import datetime, timedelta
 from marshmallow import EXCLUDE
 # My Classes
 from models.voice import VoiceState
@@ -40,12 +41,31 @@ def batch_get_voice(client: boto3.client, member_id):
         if result.get('Items') is None:
             return None
         for item in result.get('Items'):
+            if item.get('member_ids_in_channel') is None:
+                item['member_ids_in_channel'] = []
             voice = VoiceState.Schema().load(item, unknown=EXCLUDE, partial=True)
-            print(voice)
+            voice_state_dict[voice.date_time] = voice
+
             # deserialized = {k: DESERIALIZER.deserialize(v) for k, v in item}
             # voice_state_dict[deserialized.get('date_time')] = deserialized
-        print(voice_state_dict)
         return voice_state_dict
 
         # deserialized = {k: DESERIALIZER.deserialize(v) for k, v in get_result.get("Item").items()}
         # return VoiceState.Schema().load(deserialized, unknown=EXCLUDE)
+
+
+def get_time_in_voice(client: boto3.client, member_id):
+    voice_data = batch_get_voice(client, member_id)
+    time = None
+    time_in_voice = timedelta(0)
+    for dt, voice in voice_data.items():
+        if voice.channel_id is not None:
+            if time is None:
+                time = datetime.strptime(voice.date_time, '%Y-%m-%d %H:%M:%S.%f')
+        elif voice.channel_id is None and time is not None:
+            curr_time = datetime.strptime(voice.date_time, '%Y-%m-%d %H:%M:%S.%f')
+            time_in_voice = time_in_voice + (curr_time - time)
+            time = None
+    time_in_voice = time_in_voice - timedelta(microseconds=time_in_voice.microseconds)
+
+    return time_in_voice

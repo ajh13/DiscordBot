@@ -1,5 +1,6 @@
 # External Modules
 import boto3
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 from boto3.dynamodb.types import TypeSerializer, TypeDeserializer
 from marshmallow import EXCLUDE
@@ -42,6 +43,26 @@ def get_member(client: boto3.client, guild_id, member_id):
             return None
         deserialized = {k: DESERIALIZER.deserialize(v) for k, v in get_result.get("Item").items()}
         return Member.Schema().load(deserialized, unknown=EXCLUDE)
+
+
+def get_members(client: boto3.client, guild_id):
+    dynamodb = boto3.resource('dynamodb')
+    try:
+        table = dynamodb.Table(TABLE_NAME)
+        result = table.query(
+            KeyConditionExpression=Key('guild_id').eq(guild_id)
+        )
+    except ClientError as err:
+        raise err
+    else:
+        members = []
+        if result.get('Items') is None:
+            return None
+        for item in result.get('Items'):
+            member = Member.Schema().load(item, unknown=EXCLUDE, partial=True)
+            members.append(member)
+
+        return members
 
 
 def inc_stat_keys(client: boto3.client, guild_id, member_id, stat_name):

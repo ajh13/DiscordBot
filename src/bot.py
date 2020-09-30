@@ -1,4 +1,6 @@
 # Public Libraries
+from collections import OrderedDict
+
 from discord.ext import commands
 from discord.utils import get
 import logging
@@ -31,7 +33,7 @@ client = commands.Bot(command_prefix=BOT_PREFIX)
 
 @client.event
 async def on_ready():
-    print("Logged in as: " + client.user.name + "\n")
+    print("Logged in as: " + client.user.name)
     for guild in client.guilds:
         for server_member in guild.members:
             existing_member = MemberTableHelper.get_member(ddb, server_member.guild.id, server_member.id)
@@ -41,8 +43,7 @@ async def on_ready():
                                     member_name=server_member.name)
                 MemberTableHelper.put_member(ddb, new_member)
                 print("Added member to DDB: ", new_member)
-            else:
-                print("Member isn't new: ", existing_member)
+    print("Ready for requests!")
 
 
 @client.event
@@ -51,7 +52,7 @@ async def on_member_join(member):
     await member.add_roles(role)
     print(f"{member} was given {role}")
     channel = get(member.guild.channels, name=GENERAL_CHANNEL)
-    await channel.send(f"Welcome {member.mention} to the {member.guild.name}!")
+    await channel.send(f"Welcome {member.mention} to {member.guild.name}!")
     existing_member = MemberTableHelper.get_member(ddb, member.guild.id, member.id)
     if existing_member is None:
         new_member = Member(guild_id=member.guild.id, member_id=member.id, member_name=member.name)
@@ -102,10 +103,6 @@ async def on_voice_state_update(member, before, after):
 
 @client.event
 async def on_message(message):
-    """Triggered whenever anyone chats don't record for bot chatting"""
-    if message.author == client.user:
-        return
-
     print('Message from {0.author}: {0.content}'.format(message))
 
     message_data = MessageData(tts=message.tts,
@@ -136,20 +133,23 @@ async def on_raw_message_delete(payload):
 
 @client.event
 async def on_raw_message_edit(payload):
-    author_id = payload.data.get('author').get('id')
+    print(payload)
+    channel = await client.fetch_channel(payload.data.get('channel_id'))
+    message = await channel.fetch_message(payload.message_id)
+    author = message.author
     content = payload.data.get('content')
-    ddb_message = MessageTableHelper.get_message(client=ddb, member_id=author_id, message_id=payload.message_id)
+    ddb_message = MessageTableHelper.get_message(client=ddb, member_id=author.id, message_id=payload.message_id)
     ddb_message.message_data.content_history[str(payload.data.get('edited_timestamp'))] = content
     MemberTableHelper.inc_stat_keys(client=ddb,
                                     guild_id=payload.data.get('guild_id'),
-                                    member_id=author_id,
+                                    member_id=author.id,
                                     stat_name='messages_edited_count')
     MessageTableHelper.set_att_keys(client=ddb,
-                                    member_id=author_id,
+                                    member_id=author.id,
                                     message_id=payload.message_id,
                                     att_name='content_history',
                                     att_value=ddb_message.message_data.content_history)
-    print(f"{author_id} edited: {payload.message_id}: {content}")
+    print(f"{author.name}({author.id}) edited: {payload.message_id} channel:{channel.name} : {content}")
 
 
 @client.event
@@ -190,8 +190,8 @@ async def on_member_unban(guild, member):
 @client.command()
 async def stats(ctx):
     existing_member = MemberTableHelper.get_member(ddb, ctx.guild.id, ctx.author.id)
+    in_voice_time = VoiceTableHelper.get_time_in_voice(ddb, ctx.author.id)
     member_stats = existing_member.member_stats
-    print(existing_member)
     message = f"```\n" \
               f"{ctx.guild.name} Stats:\n" \
               f"Message Sent: {member_stats.messages_sent_count}\n" \
@@ -199,11 +199,33 @@ async def stats(ctx):
               f"Messages Deleted: {member_stats.messages_deleted_count}\n" \
               f"Reactions Added: {member_stats.reactions_added_count}\n" \
               f"Reactions Removed: {member_stats.reactions_removed_count}\n" \
+              f"Time in Voice Channels: {in_voice_time}\n" \
               f"```"
+    print(f"{ctx.author.name}:\n{message}")
     await ctx.author.send(content=message)
     # voice_stats = {}
     # voice_states = VoiceTableHelper.batch_get_voice(client=ddb, member_id=ctx.author.id)
     # for date_time, voice_state in sorted(voice_states.iteritems()):
+
+
+@client.command()
+async def voice_leaderboard(ctx):
+    bot_msg = await ctx.channel.send(content=f"```\nProcessing request from {ctx.author.name}, please wait.```")
+    members = MemberTableHelper.get_members(ddb, ctx.guild.id)
+    time_to_member = {}
+    for member in members:
+        voice = VoiceTableHelper.get_time_in_voice(ddb, member.member_id)
+        time_to_member[voice] = member
+    ordered_time = OrderedDict(sorted(time_to_member.items(), reverse=True))
+    message = "```\nTime spent in voice channel leaderboard:\n"
+    i = 0
+    for k, v in ordered_time.items():
+        i += 1
+        message += f"{i}) {v.member_name}: {k}\n"
+        if i == 10:
+            break
+    message += "```"
+    await bot_msg.edit(content=message)
 
 
 with open('configuration/bot_token.txt') as file:
