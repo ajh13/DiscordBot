@@ -8,9 +8,9 @@ from discord import DMChannel
 from discord.ext import commands
 from discord.utils import get
 
-import src.helper.member_table_helper as MemberTableHelper
-import src.helper.message_table_helper as MessageTableHelper
-import src.helper.voice_table_helper as VoiceTableHelper
+import helper.member_table_helper as MemberTableHelper
+import helper.message_table_helper as MessageTableHelper
+import helper.voice_table_helper as VoiceTableHelper
 from models.member import Member
 from models.message import Message, MessageData
 from models.voice import VoiceState
