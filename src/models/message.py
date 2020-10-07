@@ -1,6 +1,7 @@
-from marshmallow_dataclass import dataclass
 from datetime import datetime
 from typing import List, Dict
+
+from marshmallow_dataclass import dataclass
 
 
 @dataclass

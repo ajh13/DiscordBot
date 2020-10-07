@@ -1,19 +1,19 @@
-# Public Libraries
+import logging
+import sys
 from collections import OrderedDict
+from datetime import datetime
 
+import boto3
+from discord import DMChannel
 from discord.ext import commands
 from discord.utils import get
-import logging
-import boto3
-from datetime import datetime
-import random
-# My classes
-from models.member import Member
-from models.message import Message, MessageData
-from models.voice import VoiceState
+
 import src.helper.member_table_helper as MemberTableHelper
 import src.helper.message_table_helper as MessageTableHelper
 import src.helper.voice_table_helper as VoiceTableHelper
+from models.member import Member
+from models.message import Message, MessageData
+from models.voice import VoiceState
 
 ddb = boto3.client('dynamodb')
 # Set the logging configuration for discord.py
@@ -27,8 +27,15 @@ BOT_PREFIX = '$'
 STARTING_ROLE = 'Friend'
 GENERAL_CHANNEL = 'general'
 MEMBER_DIR = 'member_data/'
+IS_DEV = False
+BOT_TOKEN_FILE_PATH = 'configuration/bot_token.txt'
+DEV_BOT_TOKEN_FILE_PATH = 'configuration/dev_bot_token.txt'
 
 client = commands.Bot(command_prefix=BOT_PREFIX)
+
+# If dev in argument 1 program will not post to dynamoDB
+if sys.argv[1] and sys.argv[1] == "dev":
+    IS_DEV = True
 
 
 @client.event
@@ -41,8 +48,9 @@ async def on_ready():
                 new_member = Member(guild_id=server_member.guild.id,
                                     member_id=server_member.id,
                                     member_name=server_member.name)
-                MemberTableHelper.put_member(ddb, new_member)
-                print("Added member to DDB: ", new_member)
+                if not IS_DEV:
+                    MemberTableHelper.put_member(ddb, new_member)
+                    print("Added member to DDB: ", new_member)
     print("Ready for requests!")
 
 
@@ -56,8 +64,9 @@ async def on_member_join(member):
     existing_member = MemberTableHelper.get_member(ddb, member.guild.id, member.id)
     if existing_member is None:
         new_member = Member(guild_id=member.guild.id, member_id=member.id, member_name=member.name)
-        MemberTableHelper.put_member(ddb, new_member)
-        print("Added member to DDB: ", new_member)
+        if not IS_DEV:
+            MemberTableHelper.put_member(ddb, new_member)
+            print("Added member to DDB: ", new_member)
     else:
         print("Member isn't new: ", existing_member)
 
@@ -69,7 +78,8 @@ async def on_member_remove(member):
 
     existing_member = MemberTableHelper.get_member(ddb, member.guild.id, member.id)
     existing_member.active = False
-    MemberTableHelper.put_member(ddb, existing_member)
+    if not IS_DEV:
+        MemberTableHelper.put_member(ddb, existing_member)
     print("Member has left discord server: ", existing_member)
 
 
@@ -96,13 +106,15 @@ async def on_voice_state_update(member, before, after):
         self_deaf=after.self_deaf, self_stream=after.self_stream, self_video=after.self_video, afk=after.afk,
         channel_name=channel_name, channel_id=channel_id,
         member_ids_in_channel=member_ids_in_channel)
-    response = VoiceTableHelper.put_voice(client=ddb, voice_state=voice_state)
-    print(response)
-    # Triggered when member leaves all voice channels
+    if not IS_DEV:
+        response = VoiceTableHelper.put_voice(client=ddb, voice_state=voice_state)
+        print(response)
 
 
 @client.event
 async def on_message(message):
+    if isinstance(message.channel, DMChannel):
+        return
     print('Message from {0.author}: {0.content}'.format(message))
 
     message_data = MessageData(tts=message.tts,
@@ -115,8 +127,9 @@ async def on_message(message):
                                guild_id=message.guild.id,
                                created_at=message.created_at)
     new_message = Message(member_id=message.author.id, message_id=message.id, message_data=message_data)
-    MessageTableHelper.put_message(client=ddb, message=new_message)
-    MemberTableHelper.inc_stat(client=ddb, member=message.author, stat_name='messages_sent_count')
+    if not IS_DEV:
+        MessageTableHelper.put_message(client=ddb, message=new_message)
+        MemberTableHelper.inc_stat(client=ddb, member=message.author, stat_name='messages_sent_count')
 
     await client.process_commands(message)
 
@@ -127,8 +140,12 @@ async def on_raw_message_delete(payload):
     print(f"deleted: {payload.message_id}")
     if payload.cached_message:
         print(payload)
-        MessageTableHelper.set_att_keys(client=ddb, member_id=payload.cached_message.author.id, message_id=payload.message_id, att_name='deleted', att_value=True)
-        MemberTableHelper.inc_stat_keys(client=ddb, guild_id=payload.guild_id, member_id=payload.cached_message.author.id, stat_name='messages_deleted_count')
+        if not IS_DEV:
+            MessageTableHelper.set_att_keys(client=ddb, member_id=payload.cached_message.author.id,
+                                            message_id=payload.message_id, att_name='deleted', att_value=True)
+            MemberTableHelper.inc_stat_keys(client=ddb, guild_id=payload.guild_id,
+                                            member_id=payload.cached_message.author.id,
+                                            stat_name='messages_deleted_count')
 
 
 @client.event
@@ -140,28 +157,31 @@ async def on_raw_message_edit(payload):
     content = payload.data.get('content')
     ddb_message = MessageTableHelper.get_message(client=ddb, member_id=author.id, message_id=payload.message_id)
     ddb_message.message_data.content_history[str(payload.data.get('edited_timestamp'))] = content
-    MemberTableHelper.inc_stat_keys(client=ddb,
-                                    guild_id=payload.data.get('guild_id'),
-                                    member_id=author.id,
-                                    stat_name='messages_edited_count')
-    MessageTableHelper.set_att_keys(client=ddb,
-                                    member_id=author.id,
-                                    message_id=payload.message_id,
-                                    att_name='content_history',
-                                    att_value=ddb_message.message_data.content_history)
+    if not IS_DEV:
+        MemberTableHelper.inc_stat_keys(client=ddb,
+                                        guild_id=payload.data.get('guild_id'),
+                                        member_id=author.id,
+                                        stat_name='messages_edited_count')
+        MessageTableHelper.set_att_keys(client=ddb,
+                                        member_id=author.id,
+                                        message_id=payload.message_id,
+                                        att_name='content_history',
+                                        att_value=ddb_message.message_data.content_history)
     print(f"{author.name}({author.id}) edited: {payload.message_id} channel:{channel.name} : {content}")
 
 
 @client.event
 async def on_raw_reaction_add(payload):
-    MemberTableHelper.inc_stat_keys(
+    if not IS_DEV:
+        MemberTableHelper.inc_stat_keys(
         client=ddb, guild_id=payload.guild_id, member_id=payload.user_id, stat_name='reactions_added_count')
     print(f"{payload.user_id} added reaction: {payload.emoji} on {payload.message_id}")
 
 
 @client.event
 async def on_raw_reaction_remove(payload):
-    MemberTableHelper.inc_stat_keys(
+    if not IS_DEV:
+        MemberTableHelper.inc_stat_keys(
         client=ddb, guild_id=payload.guild_id, member_id=payload.user_id, stat_name='reactions_removed_count')
     print(f"{payload.user_id} removed reaction: {payload.emoji} on {payload.message_id}")
 
@@ -190,7 +210,7 @@ async def on_member_unban(guild, member):
 @client.command()
 async def stats(ctx):
     existing_member = MemberTableHelper.get_member(ddb, ctx.guild.id, ctx.author.id)
-    in_voice_time = VoiceTableHelper.get_time_in_voice(ddb, ctx.author.id)
+    in_voice_time = VoiceTableHelper.get_time_in_voice(ddb, ctx.author.id, ctx.author.guild)
     member_stats = existing_member.member_stats
     message = f"```\n" \
               f"{ctx.guild.name} Stats:\n" \
@@ -203,18 +223,25 @@ async def stats(ctx):
               f"```"
     print(f"{ctx.author.name}:\n{message}")
     await ctx.author.send(content=message)
-    # voice_stats = {}
-    # voice_states = VoiceTableHelper.batch_get_voice(client=ddb, member_id=ctx.author.id)
-    # for date_time, voice_state in sorted(voice_states.iteritems()):
 
 
 @client.command()
 async def voice_leaderboard(ctx):
     bot_msg = await ctx.channel.send(content=f"```\nProcessing request from {ctx.author.name}, please wait.```")
+    top_x = 10
+    for x in ctx.message.content.split(" "):
+        if x.find('top') != -1:
+            number = x.split('top')[1]
+            try:
+                number = int(number)
+                top_x = number
+            except:
+                top_x = top_x
+
     members = MemberTableHelper.get_members(ddb, ctx.guild.id)
     time_to_member = {}
     for member in members:
-        voice = VoiceTableHelper.get_time_in_voice(ddb, member.member_id)
+        voice = VoiceTableHelper.get_time_in_voice(ddb, member.member_id, ctx.author.guild)
         time_to_member[voice] = member
     ordered_time = OrderedDict(sorted(time_to_member.items(), reverse=True))
     message = "```\nTime spent in voice channel leaderboard:\n"
@@ -222,13 +249,13 @@ async def voice_leaderboard(ctx):
     for k, v in ordered_time.items():
         i += 1
         message += f"{i}) {v.member_name}: {k}\n"
-        if i == 10:
+        if i == top_x:
             break
     message += "```"
     await bot_msg.edit(content=message)
 
 
-with open('configuration/bot_token.txt') as file:
+with open(DEV_BOT_TOKEN_FILE_PATH if IS_DEV else BOT_TOKEN_FILE_PATH) as file:
     client.run(file.read())
 
 # Things to implement:

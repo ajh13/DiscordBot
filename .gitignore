@@ -1,3 +1,4 @@
+*.idea
 # Ignore token
 configuration/
 # Byte-compiled / optimized / DLL files

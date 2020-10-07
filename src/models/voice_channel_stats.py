@@ -1,5 +1,4 @@
 from marshmallow_dataclass import dataclass
-from datetime import datetime
 
 
 @dataclass

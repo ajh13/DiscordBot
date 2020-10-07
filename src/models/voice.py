@@ -1,7 +1,7 @@
 from dataclasses import field
+from typing import List
 
 from marshmallow_dataclass import dataclass
-from typing import List
 
 
 @dataclass

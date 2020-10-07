@@ -1,9 +1,8 @@
-# External Modules
 import boto3
-from botocore.exceptions import ClientError
 from boto3.dynamodb.types import TypeSerializer, TypeDeserializer
+from botocore.exceptions import ClientError
 from marshmallow import EXCLUDE
-# My Classes
+
 from models.message import Message
 
 TABLE_NAME = 'DiscordBot-Messages'
@@ -16,7 +15,8 @@ def put_message(client: boto3.client, message: Message):
         response = client.put_item(
             TableName=TABLE_NAME,
             Item={
-                k: SERIALIZER.serialize(v) for k, v in Message.Schema().dump(message).items() if v != "" or v is not None
+                k: SERIALIZER.serialize(v) for k, v in Message.Schema().dump(message).items() if
+                v != "" or v is not None
             }
         )
     except ClientError as err:

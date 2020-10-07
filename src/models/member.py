@@ -1,9 +1,6 @@
-from dataclasses import field
-from marshmallow_dataclass import dataclass
 from datetime import datetime
-from typing import Dict
-from models.voice import VoiceState
 
+from marshmallow_dataclass import dataclass
 
 
 @dataclass

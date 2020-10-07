@@ -1,11 +1,11 @@
-# External Modules
+from datetime import datetime
+
 import boto3
 from boto3.dynamodb.conditions import Key
-from botocore.exceptions import ClientError
 from boto3.dynamodb.types import TypeSerializer, TypeDeserializer
+from botocore.exceptions import ClientError
 from marshmallow import EXCLUDE
-from datetime import datetime
-# My Classes
+
 from models.member import Member
 
 TABLE_NAME = 'DiscordBot-MemberData'
