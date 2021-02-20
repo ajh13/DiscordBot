@@ -1,6 +1,7 @@
 *.idea
-# Ignore token
-configuration/
+# Ignore tokens
+bot_token.txt
+dev_bot_token.txt
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

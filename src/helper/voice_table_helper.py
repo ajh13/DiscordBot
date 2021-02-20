@@ -19,7 +19,7 @@ def put_voice(client: boto3.client, voice_state):
             TableName=TABLE_NAME,
             Item={
                 k: SERIALIZER.serialize(v) for k, v in VoiceState.Schema().dump(voice_state).items() if
-                v != "" or v is not None
+                v != '' or v is not None
             }
         )
     except ClientError as err:
@@ -51,7 +51,7 @@ def batch_get_voice(client: boto3.client, member_id):
             # voice_state_dict[deserialized.get('date_time')] = deserialized
         return voice_state_dict
 
-        # deserialized = {k: DESERIALIZER.deserialize(v) for k, v in get_result.get("Item").items()}
+        # deserialized = {k: DESERIALIZER.deserialize(v) for k, v in get_result.get('Item').items()}
         # return VoiceState.Schema().load(deserialized, unknown=EXCLUDE)
 
 

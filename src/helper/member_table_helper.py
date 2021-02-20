@@ -18,7 +18,7 @@ def put_member(client: boto3.client, member):
         response = client.put_item(
             TableName=TABLE_NAME,
             Item={
-                k: SERIALIZER.serialize(v) for k, v in Member.Schema().dump(member).items() if v != "" or v is not None
+                k: SERIALIZER.serialize(v) for k, v in Member.Schema().dump(member).items() if v != '' or v is not None
             }
         )
     except ClientError as err:
@@ -32,8 +32,8 @@ def get_member(client: boto3.client, guild_id, member_id):
         get_result = client.get_item(
             TableName=TABLE_NAME,
             Key={
-                "guild_id": {"N": str(guild_id)},
-                "member_id": {"N": str(member_id)}
+                'guild_id': {'N': str(guild_id)},
+                'member_id': {'N': str(member_id)}
             }
         )
     except ClientError as err:
@@ -41,7 +41,7 @@ def get_member(client: boto3.client, guild_id, member_id):
     else:
         if get_result.get('Item') is None:
             return None
-        deserialized = {k: DESERIALIZER.deserialize(v) for k, v in get_result.get("Item").items()}
+        deserialized = {k: DESERIALIZER.deserialize(v) for k, v in get_result.get('Item').items()}
         return Member.Schema().load(deserialized, unknown=EXCLUDE)
 
 
@@ -70,10 +70,10 @@ def inc_stat_keys(client: boto3.client, guild_id, member_id, stat_name):
         response = client.update_item(
             TableName=TABLE_NAME,
             Key={
-                "guild_id": {"N": str(guild_id)},
-                "member_id": {"N": str(member_id)}
+                'guild_id': {'N': str(guild_id)},
+                'member_id': {'N': str(member_id)}
             },
-            UpdateExpression="ADD member_stats.#MSG_COUNT :increment SET last_update_date = :date",
+            UpdateExpression='ADD member_stats.#MSG_COUNT :increment SET last_update_date = :date',
             ExpressionAttributeNames={
                 '#MSG_COUNT': stat_name
             },
