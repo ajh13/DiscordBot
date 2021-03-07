@@ -8,6 +8,7 @@ import discord
 from discord import DMChannel
 from discord.ext import commands
 from discord.utils import get
+from discord import Activity
 
 import helper.member_table_helper as MemberTableHelper
 import helper.message_table_helper as MessageTableHelper
@@ -25,7 +26,7 @@ logger.addHandler(handler)
 # Secret token that for the bot
 BOT_PREFIX = '$'
 STARTING_ROLE = 'Friend'
-GENERAL_CHANNEL = 'general'
+BOT_CHANNEL = 'bot-garbage'
 MEMBER_DIR = 'member_data/'
 IS_DEV = False
 BOT_TOKEN_FILE_PATH = 'configuration/bot_token.txt'
@@ -58,11 +59,10 @@ async def on_ready():
 @client.event
 async def on_member_join(member):
     await member.send(f'Welcome to the server :)')
-    print(member.guild.roles)
     role = get(member.guild.roles, name=STARTING_ROLE)
     await member.add_roles(role)
     print(f'{member} was given {role}')
-    channel = get(member.guild.channels, name=GENERAL_CHANNEL)
+    channel = get(member.guild.channels, name=BOT_CHANNEL)
     await channel.send(f'Welcome {member.mention} to {member.guild.name}!')
     existing_member = MemberTableHelper.get_member(DDB, member.guild.id, member.id)
     if existing_member is None:
@@ -76,7 +76,7 @@ async def on_member_join(member):
 
 @client.event
 async def on_member_remove(member):
-    channel = get(member.guild.channels, name=GENERAL_CHANNEL)
+    channel = get(member.guild.channels, name=BOT_CHANNEL)
     await channel.send(f'{member.mention} left the {member.guild.name}!')
 
     existing_member = MemberTableHelper.get_member(DDB, member.guild.id, member.id)
@@ -190,6 +190,20 @@ async def on_user_update(before, after):
     if before.username != after.username:
         print(f'{before.username} changed username to {after.username}')
     print('User updated')
+
+
+@client.event
+async def on_member_update(before, after):
+
+    # for activity in after_activities:
+    if after.activity and after.activity.name == 'Spotify':
+        print(f'{after.name} now listening to {after.activity.title} by {after.activity.artist}')
+
+    if before.activities != after.activities:
+        print(f'{after.name} was doing {before.activities} now doing {after.activities}')
+    if str(before.status) == "online":
+        if str(after.status) == "offline":
+            print(f'{after.name} has gone {after.status}.')
 
 
 @client.event
