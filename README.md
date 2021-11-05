@@ -1,4 +1,9 @@
 # DiscordBot
+## Setting up workspace
+1) Install all pip packages:
+    ```
+    pip install -r .\requirements.txt
+    ```
 ## Running in locally
 1) Add bot tokens to configuration folder:
     1) For bot with all features add token to `configuration/bot_token.txt`
